@@ -1,0 +1,38 @@
+首先需要简单的说明几个概念, struct event, kevent()和kqueue。
+
+struct event就是kevent()操作的最基本的事件结构。
+kevent() 是一个系统调用syscall，而kqueue是freebsd内核中的一个事件队列kernel queue。
+kevent()是kqueue的用户界面，是对kqueue进行添加，删除操作的用户态的界面。
+
+// ==========================================================
+
+下面就重点介绍一下struct event和kevent()这两个开发者必须要了解的参数和API。
+
+1. struct event 结构体中主要成员介绍
+
+ident     – 标记事件的描述符, socketfd, filefd, signal
+filter      – 事件的类型, 读事件:EVFILT_READ, 写事件:EVFILT_WRITE, 信号:EVFILT_SIGNAL
+flags     – 事件的行为, 对kqueue的操作:
+添加到kqueue中:EV_ADD, 从kqueue中删除:EV_DELETE, 这两种是主要的行为
+一次性事件:EV_ONESHOT, 此事件是或操作, 指定了该事件, kevent()返回后, 事件会从kqueue中删除
+更新事件: EV_CLEAR,此事件是或操作, 手册上的解释是，当事件通知给用户后，事件的状态会被重置。可以用在类似于epoll的ET模式，也可以用在描述符有时会出错的情况。
+其他事件: EOF事件:EV_EOF, 错误事件:EV_ERROR(返回值)
+fflags    -
+data     -
+udata   – 用户指定的数据
+2. kevent() 各参数的说明
+
+kq               - kqueue() 返回的唯一描述符, 标记着一个内核队列
+changes       – 需要对kqueue进行修改的事件集合, 此参数就是kevent()对目前kqueue中的事件的操作，比如删除kqueue中已经存在的事件，或者向kqueue中添加新的事件，也就是说，kevent()通过此参数对kqueue的修改
+nchanges     – 需要修改的事件的个数
+events         – kevent()会把所有事件存储在events中
+nevents       – kevent()需要知道存储空间有多大, == 0 : kevent()会立即返回
+timeout        – 超时控制, = NULL:kevent()会一直等到有关注的事件发生; != NULL:kevent()会等待指定的时间
+// ==========================================================
+
+有几点需要说明的是 ：
+
+1) 指定EV_ADD|EV_ONESHOT或者EV_DELETE|EV_ONESHOT的行为, kevent()返回后, 会把事件从kqueue中删除;
+
+2) 当事件类型指定为EVFILT_SIGNAL的时候, struct event 中data会返回此时信号发生了多少次
+3) 如果 nevents == 0, kevent()会立即返回, 不会理会timeout指定的超时时间, 这是一种直接注册事件的方法.
